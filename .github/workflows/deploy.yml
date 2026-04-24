@@ -1,4 +1,4 @@
-name: Deploy React Vite via FTP
+name: Produção - Deploy com zero downtime
 
 on:
   push:
@@ -6,31 +6,111 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build do projeto
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
-      - name: Clonar repositório
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Instalar Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: yarn
+
+      - name: Ativar Corepack + Yarn 4
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
 
       - name: Instalar dependências
-        run: yarn install
+        run: yarn install --immutable
 
       - name: Build do projeto
         run: yarn build
+        env:
+          VITE_API_BASE_URL_PROD: ${{ secrets.VITE_API_BASE_URL_PROD }}
+          VITE_ENCRYPT_KEY: ${{ secrets.VITE_ENCRYPT_KEY }}
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - uses: actions/upload-artifact@v4
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT }}
-          local-dir: dist/
-          server-dir: /web/check.softcash.com.br/public_html/
-          dangerous-clean-slate: true
+          name: dist
+          path: dist
+
+  deploy:
+    name: Deploy na VPS (zero downtime)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # 🔥 formato BR: 21042026-110345
+      - name: Definir versão
+        run: echo "RELEASE=$(date +'%d%m%Y-%H%M%S')" >> $GITHUB_ENV
+
+      # cria pasta da nova release
+      - name: Criar diretório da release
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 38.250.8.105
+          username: softca46
+          port: 35035
+          key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
+          script: |
+            BASE_PATH="/home/softca46/web/check.softcash.com.br"
+            mkdir -p $BASE_PATH/releases/${{ env.RELEASE }}
+
+      # envia build
+      - name: Enviar build para VPS
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz
+          path: dist/
+          remote_path: /home/softca46/web/check.softcash.com.br/releases/${{ env.RELEASE }}/
+          remote_host: 38.250.8.105
+          remote_user: softca46
+          remote_port: 35035
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
+
+      # 🔥 valida + ativa + limpa
+      - name: Ativar release com segurança
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 38.250.8.105
+          username: softca46
+          port: 35035
+          key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
+          script: |
+            BASE_PATH="/home/softca46/web/check.softcash.com.br"
+            RELEASE_PATH="$BASE_PATH/releases/${{ env.RELEASE }}"
+
+            cd $BASE_PATH
+
+            echo "📦 Validando build..."
+            if [ ! -f "$RELEASE_PATH/index.html" ]; then
+              echo "❌ Build inválido! Abortando deploy."
+              exit 1
+            fi
+
+            echo "🔎 Pegando versão atual..."
+            CURRENT=$(readlink current || echo "")
+
+            if [ -n "$CURRENT" ]; then
+              echo "💾 Salvando versão anterior como backup (previous)"
+              ln -sfn "$CURRENT" previous
+            fi
+
+            echo "🚀 Ativando nova versão"
+            ln -sfn "$RELEASE_PATH" current
+
+            echo "🧹 Limpando releases antigos (mantendo apenas 2)"
+            cd $BASE_PATH/releases
+            ls -dt */ | tail -n +3 | xargs -r rm -rf
+
+            echo "✅ Deploy finalizado com sucesso!"
