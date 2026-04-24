@@ -19,7 +19,7 @@ jobs:
           node-version: 20
 
       - name: Instalar dependências
-        run: yarn install --frozen-lockfile
+        run: yarn install
 
       - name: Build do projeto
         run: yarn build
