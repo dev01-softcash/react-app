@@ -53,8 +53,8 @@ jobs:
       - name: Definir versão
         run: echo "RELEASE=$(date +'%d%m%Y-%H%M%S')" >> $GITHUB_ENV
 
-      # ✅ CRIA DENTRO DO PUBLIC_HTML
-      - name: Criar diretório da release
+      # 📁 cria estrutura base
+      - name: Preparar diretórios
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 38.250.8.105
@@ -63,9 +63,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
           script: |
             BASE_PATH="/home/softca46/web/check.softcash.com.br/public_html"
-            mkdir -p $BASE_PATH/releases/${{ env.RELEASE }}
 
-      # ✅ ENVIA PARA O MESMO LOCAL
+            mkdir -p $BASE_PATH/releases/${{ env.RELEASE }}
+            mkdir -p $BASE_PATH/current
+            mkdir -p $BASE_PATH/previous
+
+      # 🚀 envia build
       - name: Enviar build para VPS
         uses: burnett01/rsync-deployments@7.0.1
         with:
@@ -77,7 +80,7 @@ jobs:
           remote_port: 35035
           remote_key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
 
-      # ✅ TUDO USANDO O MESMO BASE_PATH
+      # 🔥 ativação real (sem symlink)
       - name: Ativar release com segurança
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -88,8 +91,8 @@ jobs:
           script: |
             BASE_PATH="/home/softca46/web/check.softcash.com.br/public_html"
             RELEASE_PATH="$BASE_PATH/releases/${{ env.RELEASE }}"
-
-            cd $BASE_PATH
+            CURRENT_PATH="$BASE_PATH/current"
+            PREVIOUS_PATH="$BASE_PATH/previous"
 
             echo "📦 Validando build..."
             if [ ! -f "$RELEASE_PATH/index.html" ]; then
@@ -97,16 +100,15 @@ jobs:
               exit 1
             fi
 
-            echo "🔎 Pegando versão atual..."
-            CURRENT=$(readlink current || echo "")
-
-            if [ -n "$CURRENT" ]; then
-              echo "💾 Salvando versão anterior como backup (previous)"
-              ln -sfn "$CURRENT" previous
+            echo "💾 Salvando versão atual em previous..."
+            if [ -d "$CURRENT_PATH" ] && [ "$(ls -A $CURRENT_PATH)" ]; then
+              rm -rf $PREVIOUS_PATH/*
+              cp -r $CURRENT_PATH/* $PREVIOUS_PATH/
             fi
 
-            echo "🚀 Ativando nova versão"
-            ln -sfn "$RELEASE_PATH" current
+            echo "🚀 Atualizando current..."
+            rm -rf $CURRENT_PATH/*
+            cp -r $RELEASE_PATH/* $CURRENT_PATH/
 
             echo "🧹 Limpando releases antigos (mantendo apenas 2)"
             cd $BASE_PATH/releases
