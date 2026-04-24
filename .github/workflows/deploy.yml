@@ -50,11 +50,10 @@ jobs:
           name: dist
           path: dist
 
-      # 🔥 formato BR: 21042026-110345
       - name: Definir versão
         run: echo "RELEASE=$(date +'%d%m%Y-%H%M%S')" >> $GITHUB_ENV
 
-      # cria pasta da nova release
+      # ✅ CRIA DENTRO DO PUBLIC_HTML
       - name: Criar diretório da release
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -63,14 +62,14 @@ jobs:
           port: 35035
           key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
           script: |
-            BASE_PATH="/home/softca46/web/check.softcash.com.br"
+            BASE_PATH="/home/softca46/web/check.softcash.com.br/public_html"
             mkdir -p $BASE_PATH/releases/${{ env.RELEASE }}
 
-      # envia build
+      # ✅ ENVIA PARA O MESMO LOCAL
       - name: Enviar build para VPS
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz
+          switches: -avz --delete
           path: dist/
           remote_path: /home/softca46/web/check.softcash.com.br/public_html/releases/${{ env.RELEASE }}/
           remote_host: 38.250.8.105
@@ -78,7 +77,7 @@ jobs:
           remote_port: 35035
           remote_key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
 
-      # 🔥 valida + ativa + limpa
+      # ✅ TUDO USANDO O MESMO BASE_PATH
       - name: Ativar release com segurança
         uses: appleboy/ssh-action@v1.0.3
         with:
