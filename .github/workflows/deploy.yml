@@ -72,7 +72,7 @@ jobs:
         with:
           switches: -avz
           path: dist/
-          remote_path: /home/softca46/web/check.softcash.com.br/releases/${{ env.RELEASE }}/
+          remote_path: /home/softca46/web/check.softcash.com.br/public_html/releases/${{ env.RELEASE }}/
           remote_host: 38.250.8.105
           remote_user: softca46
           remote_port: 35035
