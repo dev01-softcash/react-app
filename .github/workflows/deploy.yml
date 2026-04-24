@@ -87,7 +87,7 @@ jobs:
           port: 35035
           key: ${{ secrets.SSH_PRIVATE_KEY_softca46 }}
           script: |
-            BASE_PATH="/home/softca46/web/check.softcash.com.br"
+            BASE_PATH="/home/softca46/web/check.softcash.com.br/public_html"
             RELEASE_PATH="$BASE_PATH/releases/${{ env.RELEASE }}"
 
             cd $BASE_PATH
