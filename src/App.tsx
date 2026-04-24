@@ -4,11 +4,30 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
+const nomes = [
+  { name: "Lucas" },
+  { name: "Mariana" },
+  { name: "Felipe" },
+  { name: "Camila" },
+  { name: "Rafael" },
+  { name: "Juliana" },
+  { name: "Bruno" },
+  { name: "Patrícia" },
+  { name: "Diego" },
+  { name: "Fernanda" }
+];
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(0);
+  const [names, setNames] = useState<[]>(nomes);
 
   return (
     <>
+      {nomes.map((item, index) => (
+        <div key={index}>
+          {item.name}
+        </div>
+      ))}
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />
